@@ -1,0 +1,219 @@
+version: '3.9'
+
+# Ordem de inicialização: Mosquitto e RabbitMQ → coletores de zona → gateway → dashboard/worker → sensores
+
+services:
+  # ── Infraestrutura ──────────────────────────────────────────────────────────
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: citypulse-mosquitto
+    ports:
+      - "1883:1883"   # MQTT (interno + testes locais)
+      - "9001:9001"   # WebSocket MQTT (opcional para debug)
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - citypulse
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: citypulse-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP (interno)
+      - "15672:15672" # Painel de administração
+    environment:
+      RABBITMQ_DEFAULT_USER: citypulse
+      RABBITMQ_DEFAULT_PASS: citypulse
+    networks:
+      - citypulse
+
+  # ── Serviço de ingestão (Integrante 1) ─────────────────────────────────────
+
+  ingestao:
+    build:
+      context: ./sensores-simulados
+      dockerfile: Dockerfile
+    container_name: citypulse-ingestao
+    command: ["node_modules/.bin/ts-node", "src/ingestao.ts"]
+    ports:
+      - "3001:3001"
+    environment:
+      INGESTAO_PORT: 3001
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on:
+      - mosquitto
+    networks:
+      - citypulse
+
+  # ── Sensores simulados — zona centro ────────────────────────────────────────
+
+  sensor-centro-temperatura:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-centro-temp-01
+      ZONA_ID: centro
+      TIPO: temperatura
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-centro-qualidade-ar:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-centro-qar-01
+      ZONA_ID: centro
+      TIPO: qualidade_ar
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-centro-vagas:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-centro-vagas-01
+      ZONA_ID: centro
+      TIPO: vagas_estacionamento
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-centro-energia:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-centro-energia-01
+      ZONA_ID: centro
+      TIPO: consumo_energia
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # ── Sensores simulados — zona norte ─────────────────────────────────────────
+
+  sensor-norte-temperatura:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-norte-temp-01
+      ZONA_ID: norte
+      TIPO: temperatura
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-norte-qualidade-ar:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-norte-qar-01
+      ZONA_ID: norte
+      TIPO: qualidade_ar
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-norte-vagas:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-norte-vagas-01
+      ZONA_ID: norte
+      TIPO: vagas_estacionamento
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-norte-energia:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-norte-energia-01
+      ZONA_ID: norte
+      TIPO: consumo_energia
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # ── Sensores simulados — zona sul ────────────────────────────────────────────
+
+  sensor-sul-temperatura:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-sul-temp-01
+      ZONA_ID: sul
+      TIPO: temperatura
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-sul-qualidade-ar:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-sul-qar-01
+      ZONA_ID: sul
+      TIPO: qualidade_ar
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-sul-vagas:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-sul-vagas-01
+      ZONA_ID: sul
+      TIPO: vagas_estacionamento
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-sul-energia:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-sul-energia-01
+      ZONA_ID: sul
+      TIPO: consumo_energia
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # ── Sensores simulados — zona leste ─────────────────────────────────────────
+
+  sensor-leste-temperatura:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-leste-temp-01
+      ZONA_ID: leste
+      TIPO: temperatura
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-leste-qualidade-ar:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-leste-qar-01
+      ZONA_ID: leste
+      TIPO: qualidade_ar
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-leste-vagas:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-leste-vagas-01
+      ZONA_ID: leste
+      TIPO: vagas_estacionamento
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  sensor-leste-energia:
+    build: { context: ./sensores-simulados }
+    environment:
+      SENSOR_ID: sensor-leste-energia-01
+      ZONA_ID: leste
+      TIPO: consumo_energia
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+networks:
+  citypulse:
+    driver: bridge

@@ -1,0 +1,23 @@
+{
+  "name": "sensores-simulados",
+  "version": "1.0.0",
+  "description": "Simuladores de sensores CityPulse",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "sensor": "ts-node src/index.ts",
+    "ingestao": "ts-node src/ingestao.ts",
+    "carga": "ts-node scripts/load-test.ts"
+  },
+  "dependencies": {
+    "mqtt": "^5.10.1",
+    "express": "^4.18.2",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
