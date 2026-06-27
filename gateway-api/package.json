@@ -1,0 +1,30 @@
+{
+  "name": "gateway-api",
+  "version": "1.0.0",
+  "description": "CityPulse — Gateway de API (Integrante 3)",
+  "scripts": {
+    "start": "ts-node --transpile-only src/main.ts",
+    "start:mock": "GRPC_MODE=mock ts-node --transpile-only src/main.ts",
+    "start:dev": "ts-node src/main.ts"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.1",
+    "@grpc/proto-loader": "^0.7.10",
+    "@nestjs/common": "^10.3.0",
+    "@nestjs/core": "^10.3.0",
+    "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/platform-socket.io": "^10.3.0",
+    "@nestjs/websockets": "^10.3.0",
+    "amqplib": "^0.10.3",
+    "mqtt": "^5.3.4",
+    "reflect-metadata": "^0.2.1",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "@types/amqplib": "^0.10.4",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,55 @@
+syntax = "proto3";
+package citypulse;
+
+service ZoneCollector {
+  rpc GetZoneStatus (ZoneRequest) returns (ZoneStatus);
+  rpc GetZoneHistory (HistoryRequest) returns (HistoryResponse);
+  rpc SetThreshold (ThresholdRequest) returns (ThresholdAck);
+}
+
+message ZoneRequest {
+  string zona_id = 1;
+}
+
+message Metric {
+  string tipo = 1;
+  double valor = 2;
+  string unidade = 3;
+  string timestamp = 4;
+}
+
+message ZoneStatus {
+  string zona_id = 1;
+  repeated Metric metricas = 2;
+  string papel_no_momento = 3;
+  string atualizado_em = 4;
+}
+
+message HistoryRequest {
+  string zona_id = 1;
+  string tipo = 2;
+  string de = 3;
+  string ate = 4;
+}
+
+message DataPoint {
+  string timestamp = 1;
+  double valor = 2;
+}
+
+message HistoryResponse {
+  repeated DataPoint pontos = 1;
+}
+
+message ThresholdRequest {
+  string zona_id = 1;
+  string tipo = 2;
+  double limite = 3;
+  string nivel = 4;
+}
+
+message ThresholdAck {
+  bool sucesso = 1;
+  bool confirmado_primario = 2;
+  bool confirmado_replica = 3;
+}
