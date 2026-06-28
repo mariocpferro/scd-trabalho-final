@@ -339,9 +339,13 @@ services:
       MQTT_BROKER_URL: mqtt://mosquitto:1883
       RABBITMQ_URL: amqp://citypulse:citypulse@rabbitmq:5672
       COLETOR_CENTRO_ADDR: coletor-centro:50051
+      COLETOR_CENTRO_REPLICA_ADDR: coletor-centro-replica:50051
       COLETOR_NORTE_ADDR: coletor-norte:50052
+      COLETOR_NORTE_REPLICA_ADDR: coletor-norte-replica:50052
       COLETOR_SUL_ADDR: coletor-sul:50053
+      COLETOR_SUL_REPLICA_ADDR: coletor-sul-replica:50053
       COLETOR_LESTE_ADDR: coletor-leste:50054
+      COLETOR_LESTE_REPLICA_ADDR: coletor-leste-replica:50054
     depends_on:
       - mosquitto
       - rabbitmq
