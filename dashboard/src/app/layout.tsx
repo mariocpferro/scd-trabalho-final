@@ -19,6 +19,7 @@ export default function RootLayout({
           <nav>
             <a href="/">Zonas</a>
             <a href="/replicacao">Replicação</a>
+            <a href="/historico">Histórico</a>
             <a href="/alertas">Alertas</a>
             <a href="/limites">Limites</a>
           </nav>
