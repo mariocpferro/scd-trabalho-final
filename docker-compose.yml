@@ -348,6 +348,36 @@ services:
     networks:
       - citypulse
 
+  # ── Dashboard (Integrante 4) ────────────────────────────────────────────────
+
+  dashboard:
+    build:
+      context: ./dashboard
+      args:
+        # URL pública do gateway, acessada pelo navegador do operador (não pela rede Docker).
+        NEXT_PUBLIC_GATEWAY_URL: http://localhost:3000
+    container_name: citypulse-dashboard
+    ports:
+      - "3002:3002"
+    depends_on:
+      - gateway-api
+    networks:
+      - citypulse
+
+  # ── Worker de manutenção (Integrante 4) ─────────────────────────────────────
+
+  worker-manutencao:
+    build:
+      context: ./worker-manutencao
+    container_name: citypulse-worker
+    environment:
+      RABBITMQ_URL: amqp://citypulse:citypulse@rabbitmq:5672
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+    networks:
+      - citypulse
+
 networks:
   citypulse:
     driver: bridge

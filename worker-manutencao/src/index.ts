@@ -18,8 +18,20 @@ async function processar(tarefa: TarefaManutencao): Promise<void> {
   await handler(tarefa);
 }
 
+async function conectarComRetry(tentativas = 30, intervaloMs = 2000): Promise<amqp.ChannelModel> {
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      return await amqp.connect(config.rabbitmqUrl);
+    } catch (err) {
+      console.warn(`[worker] RabbitMQ indisponível (tentativa ${i}/${tentativas}), aguardando…`);
+      await new Promise((r) => setTimeout(r, intervaloMs));
+    }
+  }
+  throw new Error(`[worker] não foi possível conectar ao RabbitMQ após ${tentativas} tentativas`);
+}
+
 async function main(): Promise<void> {
-  const conn = await amqp.connect(config.rabbitmqUrl);
+  const conn = await conectarComRetry();
   const channel = await conn.createChannel();
   await channel.assertQueue(config.fila, { durable: true });
   await channel.prefetch(1);
