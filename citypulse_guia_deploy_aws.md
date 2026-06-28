@@ -19,7 +19,7 @@ Com 5 instâncias EC2 diferentes:
 | **B — Primário** | 4× Coletor de Zona Java (primário) | t3.small | Interno |
 | **C — Réplica** | 4× Coletor de Zona Java (réplica) | t3.micro | Interno |
 | **D — Gateway** | NestJS (REST + WebSocket) + Worker | t3.micro | Público (porta 3000) |
-| **E — Dashboard** | Next.js + Sensores simulados | t3.micro | Público (porta 3001) |
+| **E — Dashboard** | Next.js (dashboard) + Sensores simulados (script de carga) | t3.micro | Público (porta 3002) |
 
 > **Custo estimado:** 3-4 dias rodando = ~$3-5 no total. Instâncias t3.micro são elegíveis ao free tier AWS (750h/mês). Se o grupo tiver créditos AWS Academy ou AWS Educate, o custo é zero.
 
@@ -48,7 +48,7 @@ No console AWS → **EC2** → **Security Groups** → **Create security group**
 |---|---|---|---|---|
 | SSH | TCP | 22 | `0.0.0.0/0` | Acesso SSH do grupo |
 | Custom TCP | TCP | 3000 | `0.0.0.0/0` | API REST + WebSocket (Gateway) |
-| Custom TCP | TCP | 3001 | `0.0.0.0/0` | Dashboard público |
+| Custom TCP | TCP | 3002 | `0.0.0.0/0` | Dashboard público |
 | All traffic | All | All | `citypulse-sg` | Instâncias do grupo conversam entre si livremente |
 
 A última regra (self-referencing) é a mais importante: ela permite que o Gateway chame o Coletor de Zona via gRPC, que o Broker receba conexões MQTT e AMQP de outras instâncias, e que a replicação funcione — tudo sem precisar abrir porta por porta para o mundo externo.
@@ -168,7 +168,7 @@ services:
       - "15672:15672"
     environment:
       - RABBITMQ_DEFAULT_USER=citypulse
-      - RABBITMQ_DEFAULT_PASS=citypulse123
+      - RABBITMQ_DEFAULT_PASS=citypulse
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     restart: unless-stopped
@@ -209,83 +209,67 @@ cd citypulse/coletor-zona
 scp -i citypulse-key.pem -r ./coletor-zona ec2-user@<IP_PUBLICO_B>:~/
 ```
 
-Criar o arquivo `.env` na Instância B (substituindo pelos IPs reais):
+Criar o arquivo `.env` dentro de `coletor-zona/` (substituindo pelos **IPs privados** reais da
+Instância A e da Instância C):
 
 ```env
-BROKER_HOST=10.0.1.10
-BROKER_PORT=1883
-PAPEL=PRIMARIO
-REPLICA_HOST=10.0.1.30
-REPLICA_SYNC_PORT_CENTRO=50061
-REPLICA_SYNC_PORT_NORTE=50062
-REPLICA_SYNC_PORT_SUL=50063
-REPLICA_SYNC_PORT_LESTE=50064
+# IP privado da Instância A (broker) e da Instância C (réplicas)
+BROKER_IP=<IP_PRIVADO_A>
+REPLICA_IP=<IP_PRIVADO_C>
 ```
 
-Criar o `docker-compose.yml`:
+Criar o `docker-compose.yml` (também dentro de `coletor-zona/`). Cada zona usa sua própria porta
+gRPC (50051–50054, que o gateway espera) e aponta `REPLICA_ADDR` para a porta de replicação da sua
+réplica na Instância C (60051–60054):
 
 ```yaml
-version: '3.8'
-
 services:
   coletor-centro:
     build: .
     container_name: coletor-centro
-    ports:
-      - "50051:50051"
+    ports: ["50051:50051"]
     environment:
-      - ZONA_ID=centro
-      - GRPC_PORT=50051
-      - BROKER_HOST=${BROKER_HOST}
-      - BROKER_PORT=${BROKER_PORT}
-      - PAPEL=${PAPEL}
-      - REPLICA_HOST=${REPLICA_HOST}
-      - REPLICA_SYNC_PORT=${REPLICA_SYNC_PORT_CENTRO}
+      ZONA_ID: centro
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50051
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+      REPLICA_ADDR: ${REPLICA_IP}:60051
     restart: unless-stopped
 
   coletor-norte:
     build: .
     container_name: coletor-norte
-    ports:
-      - "50052:50051"
+    ports: ["50052:50052"]
     environment:
-      - ZONA_ID=norte
-      - GRPC_PORT=50051
-      - BROKER_HOST=${BROKER_HOST}
-      - BROKER_PORT=${BROKER_PORT}
-      - PAPEL=${PAPEL}
-      - REPLICA_HOST=${REPLICA_HOST}
-      - REPLICA_SYNC_PORT=${REPLICA_SYNC_PORT_NORTE}
+      ZONA_ID: norte
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50052
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+      REPLICA_ADDR: ${REPLICA_IP}:60052
     restart: unless-stopped
 
   coletor-sul:
     build: .
     container_name: coletor-sul
-    ports:
-      - "50053:50051"
+    ports: ["50053:50053"]
     environment:
-      - ZONA_ID=sul
-      - GRPC_PORT=50051
-      - BROKER_HOST=${BROKER_HOST}
-      - BROKER_PORT=${BROKER_PORT}
-      - PAPEL=${PAPEL}
-      - REPLICA_HOST=${REPLICA_HOST}
-      - REPLICA_SYNC_PORT=${REPLICA_SYNC_PORT_SUL}
+      ZONA_ID: sul
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50053
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+      REPLICA_ADDR: ${REPLICA_IP}:60053
     restart: unless-stopped
 
   coletor-leste:
     build: .
     container_name: coletor-leste
-    ports:
-      - "50054:50051"
+    ports: ["50054:50054"]
     environment:
-      - ZONA_ID=leste
-      - GRPC_PORT=50051
-      - BROKER_HOST=${BROKER_HOST}
-      - BROKER_PORT=${BROKER_PORT}
-      - PAPEL=${PAPEL}
-      - REPLICA_HOST=${REPLICA_HOST}
-      - REPLICA_SYNC_PORT=${REPLICA_SYNC_PORT_LESTE}
+      ZONA_ID: leste
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50054
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+      REPLICA_ADDR: ${REPLICA_IP}:60054
     restart: unless-stopped
 ```
 
@@ -295,63 +279,129 @@ Subir (o build da imagem Java pode demorar alguns minutos):
 docker-compose up -d --build
 ```
 
+Verificar que subiu e que alcançou a réplica (Instância C):
+
+```bash
+docker-compose ps                                               # 4 coletores "Up"
+docker logs coletor-centro | grep "ZoneCollector gRPC ouvindo"  # gRPC no ar
+docker logs coletor-centro | grep "stream de replicação aberto" # conseguiu falar com a réplica C
+```
+
+> A linha **"stream de replicação aberto"** confirma que o primário alcançou a réplica na porta
+> 60051. Se a Instância C ainda não subiu, o log mostra tentativas de reconexão — é normal, ele
+> tenta sozinho até C estar no ar.
+
 ---
 
 ## Passo 8 — Deploy da Instância C (Coletores Réplica)
 
-Idêntico ao Passo 7, exceto pelo `.env`:
+A Instância C roda as 4 réplicas. Clonar o repositório e entrar em `coletor-zona/` (igual ao Passo 7).
+Ela só precisa saber onde está o broker (Instância A):
 
 ```env
-BROKER_HOST=10.0.1.10
-BROKER_PORT=1883
-PAPEL=REPLICA
-PRIMARIO_HOST=10.0.1.20
-REPLICA_SYNC_PORT_CENTRO=50061
-REPLICA_SYNC_PORT_NORTE=50062
-REPLICA_SYNC_PORT_SUL=50063
-REPLICA_SYNC_PORT_LESTE=50064
+# IP privado da Instância A (broker)
+BROKER_IP=<IP_PRIVADO_A>
 ```
 
-O mesmo `docker-compose.yml` funciona — a diferença de comportamento (primário vs. réplica) é controlada pela variável `PAPEL`. Subir da mesma forma:
+O `docker-compose.yml` da réplica é **diferente** do primário: cada réplica sobe como
+`PAPEL_INICIAL=REPLICA`, hospeda o serviço interno de replicação em `REPLICACAO_PORT` (que o
+primário acessa) e publica **duas** portas — a gRPC (5005x, para o gateway alcançá-la no failover)
+e a de replicação (6005x, para o primário enviar o stream de estado):
+
+```yaml
+services:
+  coletor-centro-replica:
+    build: .
+    container_name: coletor-centro-replica
+    ports: ["50051:50051", "60051:60051"]
+    environment:
+      ZONA_ID: centro
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50051
+      REPLICACAO_PORT: 60051
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+    restart: unless-stopped
+
+  coletor-norte-replica:
+    build: .
+    container_name: coletor-norte-replica
+    ports: ["50052:50052", "60052:60052"]
+    environment:
+      ZONA_ID: norte
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50052
+      REPLICACAO_PORT: 60052
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+    restart: unless-stopped
+
+  coletor-sul-replica:
+    build: .
+    container_name: coletor-sul-replica
+    ports: ["50053:50053", "60053:60053"]
+    environment:
+      ZONA_ID: sul
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50053
+      REPLICACAO_PORT: 60053
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+    restart: unless-stopped
+
+  coletor-leste-replica:
+    build: .
+    container_name: coletor-leste-replica
+    ports: ["50054:50054", "60054:60054"]
+    environment:
+      ZONA_ID: leste
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50054
+      REPLICACAO_PORT: 60054
+      MQTT_BROKER_URL: tcp://${BROKER_IP}:1883
+    restart: unless-stopped
+```
+
+Subir:
 
 ```bash
 docker-compose up -d --build
 ```
 
+> Observação: as portas de replicação 60051–60054 e as gRPC 50051–50054 só são acessadas por outras
+> instâncias do grupo (B e D), o que já é permitido pela regra self-referencing do `citypulse-sg` —
+> não precisam ser abertas para a internet.
+
 ---
 
 ## Passo 9 — Deploy da Instância D (Gateway + Worker)
 
-Criar o `.env`:
+Clonar o repositório e criar o `.env` **na raiz** do repositório (onde ficam as pastas
+`gateway-api/` e `worker-manutencao/`). Usar **IP privado** de A/B/C:
 
 ```env
-# Broker
-BROKER_HOST=10.0.1.10
-BROKER_PORT=1883
-AMQP_URL=amqp://citypulse:citypulse123@10.0.1.10:5672
-
-# Coletores primários (gRPC)
-COLETOR_CENTRO=10.0.1.20:50051
-COLETOR_NORTE=10.0.1.20:50052
-COLETOR_SUL=10.0.1.20:50053
-COLETOR_LESTE=10.0.1.20:50054
-
-# Coletores réplica (fallback)
-COLETOR_CENTRO_REPLICA=10.0.1.30:50051
-COLETOR_NORTE_REPLICA=10.0.1.30:50052
-COLETOR_SUL_REPLICA=10.0.1.30:50053
-COLETOR_LESTE_REPLICA=10.0.1.30:50054
-
 # API
 PORT=3000
-CORS_ORIGIN=http://<IP_PUBLICO_INSTANCIA_E>:3001
+
+# Broker (Instância A) — note os esquemas mqtt:// e amqp://
+MQTT_BROKER_URL=mqtt://<IP_PRIVADO_A>:1883
+RABBITMQ_URL=amqp://citypulse:citypulse@<IP_PRIVADO_A>:5672
+
+# Coletores primários (Instância B)
+COLETOR_CENTRO_ADDR=<IP_PRIVADO_B>:50051
+COLETOR_NORTE_ADDR=<IP_PRIVADO_B>:50052
+COLETOR_SUL_ADDR=<IP_PRIVADO_B>:50053
+COLETOR_LESTE_ADDR=<IP_PRIVADO_B>:50054
+
+# Coletores réplica (Instância C) — usados no failover
+COLETOR_CENTRO_REPLICA_ADDR=<IP_PRIVADO_C>:50051
+COLETOR_NORTE_REPLICA_ADDR=<IP_PRIVADO_C>:50052
+COLETOR_SUL_REPLICA_ADDR=<IP_PRIVADO_C>:50053
+COLETOR_LESTE_REPLICA_ADDR=<IP_PRIVADO_C>:50054
 ```
 
-Criar o `docker-compose.yml`:
+> O gateway já libera CORS para qualquer origem (`*`), então não há `CORS_ORIGIN` a configurar.
+
+Criar o `docker-compose.yml` na raiz do repositório:
 
 ```yaml
-version: '3.8'
-
 services:
   gateway:
     build: ./gateway-api
@@ -374,42 +424,53 @@ Subir:
 docker-compose up -d --build
 ```
 
+Verificar (a API deve listar as 4 zonas, consultando os coletores na Instância B):
+
+```bash
+curl http://localhost:3000/api/zonas
+```
+
 ---
 
 ## Passo 10 — Deploy da Instância E (Dashboard + Sensores)
 
-Criar o `.env`:
+Clonar o repositório e criar o `.env` na raiz. O dashboard fala com o gateway pelo **IP público**
+da Instância D (o navegador do operador é quem acessa); os sensores falam com o broker pelo
+**IP privado** da Instância A:
 
 ```env
-# Endereço público do gateway (IP público da Instância D)
-NEXT_PUBLIC_API_URL=http://<IP_PUBLICO_INSTANCIA_D>:3000
-NEXT_PUBLIC_WS_URL=ws://<IP_PUBLICO_INSTANCIA_D>:3000
+# IP PÚBLICO da Instância D (gateway) — embutido no bundle do Next.js em build-time
+NEXT_PUBLIC_GATEWAY_URL=http://<IP_PUBLICO_D>:3000
 
-# Broker para os sensores simulados
-BROKER_HOST=10.0.1.10
-BROKER_PORT=1883
+# IP privado da Instância A (broker) — usado pelos sensores simulados
+BROKER_IP=<IP_PRIVADO_A>
 ```
 
-> **Atenção:** variáveis com prefixo `NEXT_PUBLIC_` são embutidas no bundle do Next.js em tempo de build. Portanto, o IP público do Gateway deve estar definido antes de rodar `docker-compose up --build`.
+> **Atenção:** `NEXT_PUBLIC_GATEWAY_URL` é resolvida em **build-time**. Se o IP do gateway mudar,
+> é preciso rodar `docker-compose up -d --build` de novo.
 
-Criar o `docker-compose.yml`:
+Criar o `docker-compose.yml` na raiz. O serviço de sensores usa o **script de carga**
+(`load-test.ts`), que sobe 64 sensores cobrindo as 4 zonas e os 4 tipos num único processo — assim
+uma instância só gera tráfego para todo o sistema:
 
 ```yaml
-version: '3.8'
-
 services:
   dashboard:
-    build: ./dashboard
+    build:
+      context: ./dashboard
+      args:
+        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
     container_name: dashboard
     ports:
-      - "3001:3001"
-    env_file: .env
+      - "3002:3002"
     restart: unless-stopped
 
   sensores:
     build: ./sensores-simulados
     container_name: sensores
-    env_file: .env
+    command: ["node_modules/.bin/ts-node", "scripts/load-test.ts"]
+    environment:
+      MQTT_BROKER_URL: mqtt://${BROKER_IP}:1883
     restart: unless-stopped
 ```
 
@@ -418,6 +479,8 @@ Subir:
 ```bash
 docker-compose up -d --build
 ```
+
+O dashboard fica acessível em `http://<IP_PUBLICO_E>:3002`.
 
 ---
 
@@ -431,21 +494,26 @@ Instância A (Broker) → Instâncias B e C (Coletores) → Instância D (Gatewa
 
 ### Checklist de verificação
 
-**1. Broker no ar:**
+> As portas internas (MQTT 1883, gRPC 5005x, AMQP 5672) **não** ficam abertas para a internet — só
+> entre as instâncias do grupo. Por isso os testes de MQTT abaixo rodam **de dentro** da instância do
+> broker (via `docker exec`), e o de gRPC roda de dentro da Instância B.
+
+**1. Broker no ar (rodar na Instância A):**
 ```bash
-# Testar MQTT manualmente (instalar mosquitto-clients localmente ou em qualquer instância)
-mosquitto_sub -h <IP_PUBLICO_A> -p 1883 -t "citypulse/#" -v
-# Deve ficar aguardando (sem erro de conexão)
+docker exec mqtt-broker mosquitto_sub -t "citypulse/#" -v -C 1 -W 5 || echo "(ok: sem mensagens ainda)"
+# Não deve dar erro de conexão
 ```
 
-**2. Coletores respondendo via gRPC:**
+**2. Coletores respondendo via gRPC (rodar na Instância B, dentro de ~/citypulse):**
 ```bash
-# Usar grpcurl (instalar com: brew install grpcurl ou go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest)
-grpcurl -plaintext <IP_PUBLICO_B>:50051 citypulse.ZoneCollector/GetZoneStatus
-# Deve retornar JSON com status da zona centro
+# Usa a imagem do grpcurl em container + o contrato do repo — não precisa instalar nada
+docker run --rm --network host -v "$HOME/citypulse/proto:/proto:ro" fullstorydev/grpcurl \
+  -plaintext -import-path /proto -proto citypulse.proto \
+  -d '{"zona_id":"centro"}' localhost:50051 citypulse.ZoneCollector/GetZoneStatus
+# Deve retornar JSON com status da zona centro e papelNoMomento "PRIMARIO"
 ```
 
-**3. API REST respondendo:**
+**3. API REST respondendo (rodar na Instância D, ou de qualquer lugar com o IP público):**
 ```bash
 curl http://<IP_PUBLICO_D>:3000/api/zonas
 # Deve retornar JSON com as 4 zonas
@@ -453,28 +521,24 @@ curl http://<IP_PUBLICO_D>:3000/api/zonas
 
 **4. Dashboard acessível:**
 ```
-Abrir no navegador: http://<IP_PUBLICO_E>:3001
+Abrir no navegador: http://<IP_PUBLICO_E>:3002
 Deve carregar o dashboard sem erro de rede
 ```
 
-**5. Fluxo completo:**
+**5. Fluxo completo (publicar de dentro da Instância A):**
 ```bash
-# Publicar uma leitura de teste diretamente no broker
-mosquitto_pub -h <IP_PUBLICO_A> -p 1883 \
+docker exec mqtt-broker mosquitto_pub \
   -t "citypulse/sensores/centro/temperatura" \
-  -m '{"sensor_id":"test-01","zona_id":"centro","tipo":"temperatura","valor":42.0,"unidade":"celsius","timestamp":"2026-06-17T15:00:00Z"}'
-
+  -m '{"sensor_id":"test-01","zona_id":"centro","tipo":"temperatura","valor":42.0,"unidade":"celsius","timestamp":"2026-06-28T15:00:00Z"}'
 # Nos próximos segundos, o dashboard deve mostrar temperatura 42°C no Centro
 ```
 
-**6. Alertas em tempo real (WebSocket):**
+**6. Alertas em tempo real (publicar de dentro da Instância A):**
 ```bash
-# Publicar valor acima do limite configurado
-mosquitto_pub -h <IP_PUBLICO_A> -p 1883 \
+docker exec mqtt-broker mosquitto_pub \
   -t "citypulse/sensores/centro/qualidade_ar" \
-  -m '{"sensor_id":"test-02","zona_id":"centro","tipo":"qualidade_ar","valor":450.0,"unidade":"iqa","timestamp":"2026-06-17T15:00:01Z"}'
-
-# O feed de alertas no dashboard deve mostrar o alerta em segundos
+  -m '{"sensor_id":"test-02","zona_id":"centro","tipo":"qualidade_ar","valor":450.0,"unidade":"AQI","timestamp":"2026-06-28T15:00:01Z"}'
+# Valor 450 ultrapassa o limite crítico (300) → o feed de alertas no dashboard mostra o alerta em segundos
 ```
 
 ---
@@ -505,27 +569,41 @@ docker-compose logs -f gateway
 
 **Passo B:** mostrar no dashboard qual instância é primária (a tela de replicação que o Integrante 4 construiu).
 
-**Passo C:** no Terminal 1 (Instância B), derrubar todos os coletores primários:
+**Passo C:** no Terminal 1 (Instância B), derrubar os coletores primários. Há duas formas:
 ```bash
-docker-compose stop
+docker-compose kill     # queda abrupta → a réplica detecta na hora (stream cai)
+# ou
+docker-compose stop     # queda graciosa → a réplica promove em ~6s (timeout de heartbeat)
 ```
 
-**Passo D:** nos próximos 5-15 segundos (depende do intervalo de heartbeat configurado), o Terminal 2 deve mostrar o log de promoção da réplica:
+**Passo D:** no Terminal 2 (Instância C), aparece o log real de promoção da réplica. Com `kill`:
 ```
-[REPLICA] Heartbeat perdido do primário da zona centro. Promovendo para PRIMARIO.
-[REPLICA] Promovido para PRIMARIO da zona centro. Notificando gateway.
+WARN ServidorReplicacao - [centro] stream do primário encerrou com erro: ...
+WARN GerenciadorPapel   - [centro] FAILOVER: réplica promovida a PRIMARIO
+```
+Com `stop` (via watchdog de heartbeat):
+```
+WARN ServidorReplicacao - [centro] sem heartbeat do primário há 6xxx ms — promovendo
+WARN GerenciadorPapel   - [centro] FAILOVER: réplica promovida a PRIMARIO
+```
+No Terminal 3 (gateway), aparece o redirecionamento automático para a réplica:
+```
+WARN GrpcService - zona=centro primário indisponível (gRPC 14), tentando réplica
 ```
 
-**Passo E:** o dashboard deve continuar atualizando. Mostrar na tela de replicação que a Instância C assumiu como primária.
+**Passo E:** o dashboard continua atualizando — o gateway redireciona sozinho para a réplica
+(failover automático, sem intervenção). Mostrar na tela de replicação que a Instância C assumiu
+como primária (`papelNoMomento: PRIMARIO`).
 
-**Passo F:** ainda com os primários parados, publicar uma leitura de teste e confirmar que ela chegou no dashboard — prova de que o sistema continuou disponível durante a falha.
+**Passo F:** ainda com os primários parados, publicar uma leitura de teste (Passo 11, item 5) e
+confirmar que chegou no dashboard — prova de que o sistema continuou disponível durante a falha.
+A réplica promovida passa a consumir o MQTT diretamente.
 
-**Passo G (opcional, impressiona):** subir a Instância B novamente:
-```bash
-docker-compose start
-```
-
-Os coletores devem se reconectar como réplica (já que C é agora primária) e sincronizar o estado perdido.
+> **Limitação conhecida (documentar, não "consertar" ao vivo):** não há re-eleição/re-join
+> automático. Se você reativar a Instância B (`docker-compose start`), os coletores voltam como
+> **PRIMARIO** (valor de `PAPEL_INICIAL`), e ficariam dois primários no ar (split-brain). Por isso,
+> **não reative a Instância B durante a apresentação.** Para restaurar o estado limpo depois da demo,
+> derrube B e C e suba na ordem A → B → C novamente.
 
 ---
 
@@ -538,10 +616,23 @@ Verificar se o container mosquitto está rodando: `docker ps`. Verificar se a re
 A Instância B é t3.small justamente para ter mais memória durante o build Maven/Gradle. Se ainda ocorrer, adicionar flag de memória: `docker-compose build --build-arg JAVA_OPTS="-Xmx512m"`.
 
 **Dashboard não atualiza em tempo real (WebSocket não conecta):**
-Verificar que a variável `NEXT_PUBLIC_WS_URL` usa `ws://` e não `http://`. WebSocket não funciona sobre HTTP no Next.js sem configuração extra. Verificar também que a porta 3000 está aberta no security group.
+O dashboard usa um único endereço, `NEXT_PUBLIC_GATEWAY_URL` (HTTP + WebSocket no mesmo host:porta
+do gateway). Conferir que ele aponta para o **IP público** da Instância D na porta 3000 e que a
+porta 3000 está aberta no `citypulse-sg`. Lembrando que é build-time: mudou o IP, refazer o build.
 
 **gRPC "UNAVAILABLE" após failover:**
-O gateway precisa implementar retry com backoff. Se não foi implementado, forçar restart do gateway após o failover: `docker-compose restart gateway` na Instância D. Para a apresentação, esse comportamento pode ser mencionado como uma melhoria futura.
+Comportamento esperado e já tratado — o gateway tenta o primário e, ao receber `UNAVAILABLE`/
+`DEADLINE_EXCEEDED`, redireciona automaticamente para a réplica (`GrpcService.callWithFailover`).
+O `WARN ... tentando réplica` no log é normal durante a transição; nenhuma ação manual é necessária.
+
+**Coletor primário não conecta na réplica ("stream de replicação" não abre):**
+Conferir na Instância B que `REPLICA_ADDR` aponta para o IP privado da Instância C na porta de
+replicação certa (60051–60054) e que a Instância C publicou essas portas (`60051:60051`, etc.).
+A regra self-referencing do `citypulse-sg` precisa estar ativa.
+
+**Réplica sobe como PRIMARIO (failover não acontece):**
+Sinal de que `PAPEL_INICIAL=REPLICA` não chegou ao container da Instância C. Conferir o `.env`/
+`docker-compose.yml` da réplica (o nome correto é `PAPEL_INICIAL`, não `PAPEL`).
 
 **Variável NEXT_PUBLIC não reflete o IP correto:**
 Variáveis `NEXT_PUBLIC_` são resolvidas em build-time, não em runtime. Qualquer mudança de IP exige `docker-compose up -d --build` novamente na Instância E.
