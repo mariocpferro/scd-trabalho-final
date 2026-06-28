@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { listarZonas } from '@/lib/api';
-import { ZonaCard } from '@/components/ZonaCard';
+import { ReplicacaoLinha } from '@/components/ReplicacaoLinha';
 import type { Zona } from '@/lib/types';
 
-export default function HomePage() {
+export default function ReplicacaoPage() {
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -21,10 +21,14 @@ export default function HomePage() {
 
   return (
     <>
-      <h2>Status das zonas</h2>
-      <div className="grid">
+      <h2>Replicação por zona</h2>
+      <p className="muted">
+        Papel atual do coletor de cada zona. Ao derrubar um primário, a réplica assume e
+        este painel reflete a mudança automaticamente.
+      </p>
+      <div className="repl-lista">
         {zonas.map((z) => (
-          <ZonaCard key={z.id} zona={z} />
+          <ReplicacaoLinha key={z.id} zona={z} />
         ))}
       </div>
     </>

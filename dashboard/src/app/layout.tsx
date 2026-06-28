@@ -18,6 +18,7 @@ export default function RootLayout({
           <h1>🏙 CityPulse</h1>
           <nav>
             <a href="/">Zonas</a>
+            <a href="/replicacao">Replicação</a>
             <a href="/alertas">Alertas</a>
             <a href="/limites">Limites</a>
           </nav>
