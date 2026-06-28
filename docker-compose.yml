@@ -214,6 +214,117 @@ services:
     depends_on: [mosquitto]
     networks: [citypulse]
 
+  # ── Coletores de Zona (Integrante 2) ────────────────────────────────────────
+  # Cada zona = 1 primário + 1 réplica (mesmo binário Java, parametrizado por ZONA_ID).
+  # O gateway lê sempre do primário (coletor-<zona>:5005x). O serviço interno de
+  # replicação (porta 60051) fica entre primário e réplica e não é exposto.
+  # Portas gRPC publicadas no host para teste com grpcurl:
+  #   primários 50051-50054 ; réplicas 50055-50058.
+
+  # zona centro
+  coletor-centro:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-centro
+    environment:
+      ZONA_ID: centro
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50051
+      REPLICA_ADDR: coletor-centro-replica:60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50051:50051"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+  coletor-centro-replica:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-centro-replica
+    environment:
+      ZONA_ID: centro
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50051
+      REPLICACAO_PORT: 60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50055:50051"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # zona norte
+  coletor-norte:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-norte
+    environment:
+      ZONA_ID: norte
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50052
+      REPLICA_ADDR: coletor-norte-replica:60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50052:50052"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+  coletor-norte-replica:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-norte-replica
+    environment:
+      ZONA_ID: norte
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50052
+      REPLICACAO_PORT: 60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50056:50052"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # zona sul
+  coletor-sul:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-sul
+    environment:
+      ZONA_ID: sul
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50053
+      REPLICA_ADDR: coletor-sul-replica:60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50053:50053"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+  coletor-sul-replica:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-sul-replica
+    environment:
+      ZONA_ID: sul
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50053
+      REPLICACAO_PORT: 60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50057:50053"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
+  # zona leste
+  coletor-leste:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-leste
+    environment:
+      ZONA_ID: leste
+      PAPEL_INICIAL: PRIMARIO
+      GRPC_PORT: 50054
+      REPLICA_ADDR: coletor-leste-replica:60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50054:50054"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+  coletor-leste-replica:
+    build: { context: ./coletor-zona }
+    container_name: citypulse-coletor-leste-replica
+    environment:
+      ZONA_ID: leste
+      PAPEL_INICIAL: REPLICA
+      GRPC_PORT: 50054
+      REPLICACAO_PORT: 60051
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+    ports: ["50058:50054"]
+    depends_on: [mosquitto]
+    networks: [citypulse]
+
   # ── Gateway de API (Integrante 3) ───────────────────────────────────────────
 
   gateway-api:

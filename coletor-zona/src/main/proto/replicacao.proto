@@ -1,0 +1,41 @@
+// Contrato INTERNO de replicação primário→réplica do Coletor de Zona.
+// NÃO é compartilhado com os outros integrantes — só os processos coletor falam entre si.
+syntax = "proto3";
+package citypulse.interno;
+
+option java_multiple_files = true;
+option java_package = "com.citypulse.grpc.interno";
+option java_outer_classname = "ReplicacaoProto";
+
+service ReplicacaoColetor {
+  // Stream contínuo de atualizações de estado do primário para a réplica.
+  // Cada AtualizacaoEstado pode ser uma leitura nova ou apenas um heartbeat de keepalive.
+  // Se este stream cair ou parar de chegar heartbeat, a réplica se promove a primário.
+  rpc ReplicarEstado (stream AtualizacaoEstado) returns (ReplicacaoAck);
+
+  // Aplicação síncrona de limite na réplica — usada pelo SetThreshold para
+  // garantir consistência forte (primário só confirma após a réplica confirmar).
+  rpc AplicarLimite (LimiteUpdate) returns (LimiteAck);
+}
+
+message AtualizacaoEstado {
+  bool heartbeat = 1;     // true = só keepalive (sem leitura)
+  string tipo = 2;
+  double valor = 3;
+  string unidade = 4;
+  string timestamp = 5;
+}
+
+message ReplicacaoAck {
+  bool ok = 1;
+}
+
+message LimiteUpdate {
+  string tipo = 1;
+  double limite = 2;
+  string nivel = 3;
+}
+
+message LimiteAck {
+  bool aplicado = 1;
+}
