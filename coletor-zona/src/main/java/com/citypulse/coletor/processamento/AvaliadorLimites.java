@@ -3,6 +3,7 @@ package com.citypulse.coletor.processamento;
 import com.citypulse.coletor.estado.EstadoZona;
 import com.citypulse.coletor.modelo.Limite;
 import com.citypulse.coletor.mqtt.PublicadorAlertas;
+import com.citypulse.coletor.replicacao.GerenciadorPapel;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,14 +20,21 @@ public class AvaliadorLimites {
 
     private final EstadoZona estado;
     private final PublicadorAlertas publicador;
+    private final GerenciadorPapel gerenciador;
     private final Map<String, Long> ultimoAlerta = new ConcurrentHashMap<>();
 
-    public AvaliadorLimites(EstadoZona estado, PublicadorAlertas publicador) {
+    public AvaliadorLimites(EstadoZona estado, PublicadorAlertas publicador, GerenciadorPapel gerenciador) {
         this.estado = estado;
         this.publicador = publicador;
+        this.gerenciador = gerenciador;
     }
 
     public void avaliar(String tipo, double valor) {
+        // Só o PRIMARIO publica alertas; a réplica apenas mantém estado (evita alerta duplicado).
+        if (!gerenciador.ehPrimario()) {
+            return;
+        }
+
         Limite limite = estado.getLimite(tipo);
         if (limite == null || !limite.violado(valor)) {
             return;

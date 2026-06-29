@@ -54,7 +54,7 @@ public class App {
         // ── MQTT (conexão compartilhada para ingestão e publicação de alertas) ──
         MqttClient mqtt = conectarMqtt(brokerUrl, zonaId, papelInicial);
         PublicadorAlertas publicador = new PublicadorAlertas(mqtt, zonaId);
-        AvaliadorLimites avaliador = new AvaliadorLimites(estado, publicador);
+        AvaliadorLimites avaliador = new AvaliadorLimites(estado, publicador, gerenciador);
         Sanitizador sanitizador = new Sanitizador();
 
         // ── Replicação ──
