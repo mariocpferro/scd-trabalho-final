@@ -1,4 +1,10 @@
 import 'reflect-metadata';
+
+// Previne qualquer conexão real com RabbitMQ
+jest.mock('amqplib', () => ({
+  connect: jest.fn().mockRejectedValue(new Error('no rabbitmq in tests')),
+}));
+
 import { RabbitMqService } from './rabbitmq.service';
 
 describe('RabbitMqService', () => {
@@ -6,12 +12,11 @@ describe('RabbitMqService', () => {
 
   beforeEach(() => {
     service = new RabbitMqService();
-    // Impede conexão real com RabbitMQ durante os testes
-    jest.spyOn(service as any, 'connect').mockResolvedValue(undefined);
+    // Deixa o channel null (estado pós-falha de conexão) por padrão
+    (service as any).channel = null;
   });
 
   it('descarta mensagem silenciosamente quando channel é null', async () => {
-    (service as any).channel = null;
     await expect(service.publish({ tipo: 'teste' })).resolves.toBeUndefined();
   });
 
@@ -32,5 +37,16 @@ describe('RabbitMqService', () => {
       tipo: 'reconciliacao',
       zona_id: 'centro',
     });
+  });
+
+  it('serializa mensagens arbitrárias como JSON', async () => {
+    const sendToQueue = jest.fn();
+    (service as any).channel = { sendToQueue };
+    const msg = { x: 1, y: [2, 3] };
+
+    await service.publish(msg);
+
+    const enviado = JSON.parse(sendToQueue.mock.calls[0][1].toString());
+    expect(enviado).toEqual(msg);
   });
 });
