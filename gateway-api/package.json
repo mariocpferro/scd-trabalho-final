@@ -5,7 +5,15 @@
   "scripts": {
     "start": "ts-node --transpile-only src/main.ts",
     "start:mock": "GRPC_MODE=mock ts-node --transpile-only src/main.ts",
-    "start:dev": "ts-node src/main.ts"
+    "start:dev": "ts-node src/main.ts",
+    "test": "jest"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": ["ts-jest", { "tsconfig": { "experimentalDecorators": true, "emitDecoratorMetadata": true } }] },
+    "testEnvironment": "node"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.10.1",
@@ -22,8 +30,12 @@
     "socket.io": "^4.7.4"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.1.27",
     "@types/amqplib": "^0.10.4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
